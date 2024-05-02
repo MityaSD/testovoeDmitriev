@@ -31,6 +31,9 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define rxBufferHead  (BUFFER_SIZE - hdma_usart1_rx.Instance->NDTR)
+//#define txBufferHead  (BUFFER_SIZE - hdma_usart1_tx.Instance->NDTR)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -53,15 +56,24 @@ static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-
+uint16_t dataProcessing();
+void SendMessageSlave(unionReceipt_t *message);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 	int counter = 0;
 	unionUART_t unionUART;
-	receptionState_t reception_state = STATE_WAITING_TAG;
-	void SetReceptionState(receptionState_t new_state);
+	unionReceipt_t unionReceipt;
+	
+	
+	uint8_t rxBuffer[BUFFER_SIZE];
+	uint8_t txBuffer[BUFFER_SIZE];
+	
+		//uint16_t rxBufferHead = rxBufferHeadDEFINE;
+	unsigned long int rxBufferTail = 0;
+	unsigned int txBufferTail = 0;
+	unsigned int txBufferHead =0;
 /* USER CODE END 0 */
 
 /**
@@ -96,7 +108,7 @@ int main(void)
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
 	
-	SetReceptionState(STATE_WAITING_TAG);
+	HAL_UART_Receive_DMA(&huart1,rxBuffer, BUFFER_SIZE); 
 		
   /* USER CODE END 2 */
 
@@ -104,10 +116,13 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+		HAL_Delay(100);
+		dataProcessing();
     /* USER CODE END WHILE */
-
+		
+	}
     /* USER CODE BEGIN 3 */
-  }
+  
   /* USER CODE END 3 */
 }
 
@@ -220,58 +235,24 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
-    static int number = 0;
-    uint16_t crc = 0;
-  
-    if (huart == &huart1) 
-    {
-        switch (reception_state)
-        {
-            case STATE_WAITING_TAG:
-                if (unionUART.package.tag == TAG)
-                {
-									SetReceptionState(STATE_WAITING_LENGTH);
-                }
-								else
-								{
-									SetReceptionState(STATE_WAITING_TAG);
-								}
-                break;
-                
-            case STATE_WAITING_LENGTH:
-									
-								SetReceptionState(STATE_RECEIVING_DATA);    
-						
-                break;
-                
-            case STATE_RECEIVING_DATA:
-                crc = Crc16(unionUART.package.data, unionUART.package.length);
-                if (crc != unionUART.package.crc)
-                {
-									SetReceptionState(STATE_WAITING_TAG);   
-                  break;
-                }
 
-                if (unionUART.package.data[0] != number)
-                {
-									unionUART.package.tag = TAG;
-                  unionUART.package.length = 1;
-                  *unionUART.package.data = number--;//at the end of HAL_UART_RxCpltCallback() number++
-                    
-                  unionUART.package.crc = Crc16(unionUART.package.data, unionUART.package.length);  
-                  HAL_UART_Transmit_DMA(&huart1, unionUART.masUART, unionUART.package.length + 4);//+4 tag(1), length(1), crc(2)
-                }
-                
-								SetReceptionState(STATE_WAITING_TAG);
-                number++;
-                break;
-                
-            default:
-								SetReceptionState(STATE_WAITING_TAG);
-                break;
-        }
-    }
 }   
+
+void SendMessageSlave(unionReceipt_t *message)
+{
+	for(int i=0; i< sizeof(receipt_t);i++)
+	{
+		txBuffer[txBufferHead] = message->masReceipt[i];
+		txBufferHead = (txBufferHead + 1) % BUFFER_SIZE;
+	}
+
+	if(__HAL_UART_GET_FLAG(&huart1, UART_FLAG_TXE))
+	{
+		HAL_UART_Transmit_DMA(&huart1, txBuffer ,txBufferHead);
+		txBufferHead =0;
+	}
+	
+	}
 
 uint16_t Crc16(uint8_t * pcBlock, unsigned short len)
 {
@@ -283,33 +264,55 @@ uint16_t Crc16(uint8_t * pcBlock, unsigned short len)
     return crc;
 }
 
-void SetReceptionState(receptionState_t new_state)
+uint16_t dataProcessing(void)
 {
-    reception_state = new_state;
-    
-    switch (reception_state)
-    {
-        case STATE_WAITING_TAG:
-					
-            Receive(&unionUART.package.tag, sizeof(unionUART.package.tag));
-						//HAL_UART_Receive_DMA(&huart1, &unionUART.package.tag, 1);
-						break;
-            
-        case STATE_WAITING_LENGTH:
-						Receive(&unionUART.package.length, sizeof(unionUART.package.length));
-            //HAL_UART_Receive_DMA(&huart1, &unionUART.package.length, sizeof(unionUART.package.length));
-            break;
-            
-        case STATE_RECEIVING_DATA:
-						Receive(&unionUART.masUART[2], unionUART.package.length + sizeof(unionUART.package.crc));
-            //HAL_UART_Receive_DMA(&huart1, &unionUART.masUART[2], unionUART.package.length + sizeof(unionUART.package.crc));// +2 sizeof(CRC)
-            break;
-            
-        default:
-            HAL_UART_Receive_DMA(&huart1, unionUART.masUART, sizeof(unionUART.package.tag));
-            break;
-    }
+	static uint8_t state = STATE_WAITING_LENGTH;
+	uint16_t headPackage = 0;
+	uint16_t crc = 0;
+		while(rxBufferTail!= rxBufferHead)
+		{
+				//data[rxBufferTail] = rxBuffer[rxBufferTail];
+			if(state == STATE_WAITING_LENGTH)
+			{
+				unionUART.package.length = rxBuffer[rxBufferTail];
+				
+				rxBufferTail++;
+				rxBufferTail = rxBufferTail % BUFFER_SIZE;	
+				
+				headPackage = (rxBufferTail + unionUART.package.length)%BUFFER_SIZE;
+				state = STATE_RECEIVING_DATA;
+			}
+			else if(state == STATE_RECEIVING_DATA)
+			{
+				while(rxBufferTail != headPackage)
+				{
+					unionUART.masUART[rxBufferTail] = rxBuffer[rxBufferTail];
+					rxBufferTail++;
+					rxBufferTail = rxBufferTail % BUFFER_SIZE;				
+				}
+				state = STATE_PROCESSING_DATA;
+			}
+			else if(state == STATE_PROCESSING_DATA)
+			{
+				crc = Crc16(unionUART.package.data, /*unionUART.package.length*/ SIZE_DATA );
+				if(crc != unionUART.package.crc)
+				{
+					unionReceipt.receipt.state = ERROR_RECEIPT;
+				}
+				else
+				{
+					unionReceipt.receipt.state = OK;
+				}
+				unionReceipt.receipt.length = 3;
+				unionReceipt.receipt.crc = Crc16(&unionReceipt.receipt.state,unionReceipt.receipt.length);
+				SendMessageSlave(&unionReceipt);
+				state =STATE_WAITING_LENGTH; 
+			}
+		}	
+		//state =STATE_WAITING_LENGTH;
+		return 1;
 }
+	
 
 /* USER CODE END 4 */
 

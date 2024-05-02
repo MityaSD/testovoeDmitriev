@@ -3,30 +3,46 @@
 
 #include <stdint.h>
 
-#define TAG 0x4f
-#define Receive(pData, Size) HAL_UART_Receive_DMA(&huart1, pData, Size)
+#define BUFFER_SIZE 1024
+#define SIZE_DATA 20
+#define SIZE_CRC 2
 
-typedef struct
+typedef struct __attribute__((packed))
 {
-    uint8_t tag;
     uint8_t length;
     uint16_t crc;
-    uint8_t data[255+4]; 
+    uint8_t data[SIZE_DATA]; 
 }package_t;
 
 typedef union
 {
     package_t package;
-    uint8_t masUART[255+4];
+    uint8_t masUART[sizeof(package_t)];
 }unionUART_t;
 
-typedef enum {
-    STATE_WAITING_TAG,
-    STATE_WAITING_LENGTH,
-    STATE_RECEIVING_DATA,
-    STATE_CRC_CHECK,
-    STATE_TRANSMIT_RESPONSE
-} receptionState_t;
+typedef struct __attribute__((packed))
+{
+	uint8_t length;
+	uint16_t crc;
+	uint8_t state;
+}receipt_t;
+
+typedef union{
+	receipt_t receipt;
+	uint8_t masReceipt[sizeof(receipt_t)];
+}unionReceipt_t;
+
+enum {
+	STATE_WAITING_LENGTH,
+	STATE_CRC_CHECK,
+	STATE_RECEIVING_DATA,
+	STATE_PROCESSING_DATA
+};
+
+enum{
+		OK = 1,
+		ERROR_RECEIPT
+};
 
 const unsigned short Crc16Table[256] = {
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50A5, 0x60C6, 0x70E7,
