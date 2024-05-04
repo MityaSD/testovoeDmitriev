@@ -4,18 +4,24 @@
 
 #define TAG 0x4f
 
-typedef struct
+/*typedef struct
 {
-    uint8_t tag;
     uint8_t length;
     uint16_t crc;
-    uint8_t data[255+4]; 
-}Paket_t;
+    uint8_t data[20]; 
+}Paket_t;*/
 
-typedef union
+typedef struct __attribute__((packed))
+{
+    uint8_t length;
+    uint16_t crc;
+    uint8_t data[20]; 
+} Paket_t;
+
+typedef union /*__attribute__((packed))*/
 {
     Paket_t Paket;
-    uint8_t masUART[255+4];
+    uint8_t masUART[sizeof(Paket_t)];
 }unionUART_t;
 
 const unsigned short Crc16Table[256] = {
