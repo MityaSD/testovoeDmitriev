@@ -69,6 +69,7 @@ void SendMessageSlave(unionReceipt_t *message);
 void SendMessageMaster(unionUART_t *message);
 void creatingData(unionUART_t* unionUART, uint8_t length);
 uint16_t readingLength(uint8_t *length, CircBuf_t *circBuf);
+void readingData(uint8_t headPackage, CircBuf_t *circBuf, uint8_t *dataStruct, uint16_t sizeStruct);
 void updateHead(void);
 /* USER CODE END PFP */
 
@@ -462,20 +463,27 @@ uint16_t dataProcessingMaster(void)
 
 	while(rxMaster.head != rxMaster.tail)
 	{
-			if(state == STATE_WAITING_LENGTH)
+			switch(state)
 			{
-				headPackage = readingLength(&unionReceipt.receipt.length, &rxMaster);
-				state = STATE_RECEIVING_DATA;
-			}
-			else if(state == STATE_RECEIVING_DATA)
-			{
-				while(rxMaster.tail != headPackage)
+				case STATE_WAITING_LENGTH:
+				
+					headPackage = readingLength(&unionReceipt.receipt.length, &rxMaster);
+					state = STATE_RECEIVING_DATA;
+					break;
+				
+				case STATE_RECEIVING_DATA:
 				{
-					unionReceipt.masReceipt[(rxMaster.tail % sizeof(receipt_t))] = rxMaster.buffer[rxMaster.tail];
-					rxMaster.tail = (rxMaster.tail + 1) % BUFFER_SIZE;
+					//readingData(headPackage, &rxMaster, unionReceipt.masReceipt, sizeof(receipt_t));
+					while(rxMaster.tail != headPackage)
+					{
+						unionReceipt.masReceipt[(rxMaster.tail % sizeof(receipt_t))] = rxMaster.buffer[rxMaster.tail];
+						rxMaster.tail = (rxMaster.tail + 1) % BUFFER_SIZE;
+					}
+					state = STATE_PROCESSING_DATA;
+					break;
 				}
-				state = STATE_PROCESSING_DATA;
 			}
+			
 		}
 		if(state == STATE_PROCESSING_DATA)
 		{
@@ -511,27 +519,29 @@ uint16_t dataProcessingSlave(void)
 	
 		while(rxSlave.tail != rxSlave.head)
 		{
-			if(state == STATE_WAITING_LENGTH)
+			switch(state)
 			{
-				/*unionUART.package.length = rxSlave.buffer[rxSlave.tail];
-			
-				rxSlave.tail = (rxSlave.tail + 1) % BUFFER_SIZE;	
-				
-				headPackage = (rxSlave.tail + unionUART.package.length)%BUFFER_SIZE;
-				*/
-				headPackage = readingLength(&unionUART.package.length, &rxSlave);
-				state = STATE_RECEIVING_DATA;
-			}
-			else if(state == STATE_RECEIVING_DATA)
-			{
+				case STATE_WAITING_LENGTH:
+					headPackage = readingLength(&unionUART.package.length, &rxSlave);
+					state = STATE_RECEIVING_DATA;
+					break;
+				case STATE_RECEIVING_DATA:
+					
+				//readingData(headPackage, &rxSlave,unionUART.masUART, sizeof(package_t));
 				while(rxSlave.tail != headPackage)
 				{
 					unionUART.masUART[(rxSlave.tail % sizeof(package_t))] = rxSlave.buffer[rxSlave.tail];
 					rxSlave.tail = (rxSlave.tail + 1) % BUFFER_SIZE;				
 				}
+				
 				state = STATE_PROCESSING_DATA;
+				
+				break;
+					
 			}
+			
 		}
+		
 		if(state == STATE_PROCESSING_DATA)
 		{
 			crc = Crc16(unionUART.package.data,  SIZE_DATA );
@@ -576,6 +586,17 @@ uint16_t readingLength(uint8_t *length, CircBuf_t *circBuf)
 	circBuf->tail = (circBuf->tail + 1) % BUFFER_SIZE;
 		
 	return (*length + circBuf->tail) % BUFFER_SIZE ;
+}
+
+void readingData(uint8_t headPackage, CircBuf_t *circBuf, uint8_t *dataStruct, uint16_t sizeStruct)
+{
+	while(circBuf->tail!= headPackage)
+	{
+		dataStruct[(circBuf->tail) % sizeStruct] = circBuf->buffer[circBuf->tail];
+		circBuf->tail ++;
+		circBuf->tail = circBuf->tail % BUFFER_SIZE;
+	}
+	return;
 }
 
 /* USER CODE END 4 */

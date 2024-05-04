@@ -3,7 +3,7 @@
 <title>Static Call Graph - [testDmitriev\testDmitriev.axf]</title></head>
 <body><HR>
 <H1>Static Call Graph for image testDmitriev\testDmitriev.axf</H1><HR>
-<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6190004: Last Updated: Sun May  5 00:01:43 2024
+<BR><P>#&#060CALLGRAPH&#062# ARM Linker, 6190004: Last Updated: Sun May  5 01:07:54 2024
 <BR><P>
 <H3>Maximum Stack Usage =        216 bytes + Unknown(Functions without stacksize, Cycles, Untraceable Function Pointers)</H3><H3>
 Call chain for Maximum Stack Depth:</H3>
@@ -1010,8 +1010,8 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[55]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[af]"></a>dataProcessingMaster</STRONG> (Thumb, 488 bytes, Stack size 48 bytes, main.o(.text.dataProcessingMaster))
-<BR><BR>[Stack]<UL><LI>Max Depth = 72<LI>Call Chain = dataProcessingMaster &rArr; HAL_Delay
+<P><STRONG><a name="[af]"></a>dataProcessingMaster</STRONG> (Thumb, 482 bytes, Stack size 56 bytes, main.o(.text.dataProcessingMaster))
+<BR><BR>[Stack]<UL><LI>Max Depth = 80<LI>Call Chain = dataProcessingMaster &rArr; HAL_Delay
 </UL>
 <BR>[Calls]<UL><LI><a href="#[b0]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;HAL_GPIO_TogglePin
 <LI><a href="#[b1]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;readingLength
@@ -1022,7 +1022,7 @@ Global Symbols
 <BR>[Called By]<UL><LI><a href="#[55]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;main
 </UL>
 
-<P><STRONG><a name="[b2]"></a>dataProcessingSlave</STRONG> (Thumb, 342 bytes, Stack size 24 bytes, main.o(.text.dataProcessingSlave))
+<P><STRONG><a name="[b2]"></a>dataProcessingSlave</STRONG> (Thumb, 336 bytes, Stack size 24 bytes, main.o(.text.dataProcessingSlave))
 <BR><BR>[Stack]<UL><LI>Max Depth = 136<LI>Call Chain = dataProcessingSlave &rArr; SendMessageSlave &rArr; HAL_UART_Transmit_DMA &rArr; HAL_DMA_Start_IT &rArr; DMA_SetConfig
 </UL>
 <BR>[Calls]<UL><LI><a href="#[a4]">&gt;&gt;</a>&nbsp;&nbsp;&nbsp;SendMessageSlave
