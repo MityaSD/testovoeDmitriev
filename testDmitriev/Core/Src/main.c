@@ -464,11 +464,7 @@ uint16_t dataProcessingMaster(void)
 	{
 			if(state == STATE_WAITING_LENGTH)
 			{
-				unionReceipt.receipt.length = rxMaster.buffer[rxMaster.tail];
-				rxMaster.tail = (rxMaster.tail + 1) % BUFFER_SIZE;
-				
-				headPackage = (rxMaster.tail + unionReceipt.receipt.length) % BUFFER_SIZE;
-				
+				headPackage = readingLength(&unionReceipt.receipt.length, &rxMaster);
 				state = STATE_RECEIVING_DATA;
 			}
 			else if(state == STATE_RECEIVING_DATA)
@@ -517,11 +513,13 @@ uint16_t dataProcessingSlave(void)
 		{
 			if(state == STATE_WAITING_LENGTH)
 			{
-				unionUART.package.length = rxSlave.buffer[rxSlave.tail];
+				/*unionUART.package.length = rxSlave.buffer[rxSlave.tail];
 			
 				rxSlave.tail = (rxSlave.tail + 1) % BUFFER_SIZE;	
 				
 				headPackage = (rxSlave.tail + unionUART.package.length)%BUFFER_SIZE;
+				*/
+				headPackage = readingLength(&unionUART.package.length, &rxSlave);
 				state = STATE_RECEIVING_DATA;
 			}
 			else if(state == STATE_RECEIVING_DATA)
