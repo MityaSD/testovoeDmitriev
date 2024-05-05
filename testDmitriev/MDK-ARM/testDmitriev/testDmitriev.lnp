@@ -3,6 +3,7 @@
 "testdmitriev\main.o"
 "testdmitriev\stm32f4xx_it.o"
 "testdmitriev\stm32f4xx_hal_msp.o"
+"testdmitriev\functions.o"
 "testdmitriev\stm32f4xx_hal_tim.o"
 "testdmitriev\stm32f4xx_hal_tim_ex.o"
 "testdmitriev\stm32f4xx_hal_rcc.o"

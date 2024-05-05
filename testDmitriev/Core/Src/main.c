@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "type.h"
 #include "stdio.h"
+#include "functions.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -63,14 +64,7 @@ static void MX_USART1_UART_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
-uint16_t dataProcessingSlave(void);
-uint16_t dataProcessingMaster(void);
-void SendMessageSlave(unionReceipt_t *message);
-void SendMessageMaster(unionUART_t *message);
-void creatingData(unionUART_t* unionUART, uint8_t length);
-uint16_t readingLength(uint8_t *length, CircBuf_t *circBuf);
-void readingData(uint8_t headPackage, CircBuf_t *circBuf, uint8_t *dataStruct, uint16_t sizeStruct);
-void updateHead(void);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -393,211 +387,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		}
 }
 
-void SendMessageMaster(unionUART_t *message)//MASTER->SLAVE
-{
-	for(int i=0; i< message->package.length + 1;i++)//Sizeof(length) = 1
-	{
-		txMaster.buffer[txMaster.head] = message->masUART[i];
-		txMaster.head= (txMaster.head + 1) % BUFFER_SIZE;
-		
-	}
-	if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_TXE))
-	{
-		HAL_UART_Transmit_DMA(&huart2, txMaster.buffer, sizeof(package_t));
-		txMaster.head = 0;
-	}
-	updateHead();
-	return;
-}
 
-void SendMessageSlave(unionReceipt_t *message)//SLAVE->MASTER
-{
-	for(int i=0; i< sizeof(receipt_t);i++)
-	{
-		txSlave.buffer[txSlave.head] = message->masReceipt[i];
-		txSlave.head = (txSlave.head + 1) % BUFFER_SIZE;
-	}
-
-	if(__HAL_UART_GET_FLAG(&huart1, UART_FLAG_TXE))
-	{
-		HAL_UART_Transmit_DMA(&huart1, txSlave.buffer, txSlave.head);
-		txSlave.head =0;
-	}
-	
-	updateHead();
-	
-	return;
-	}
-
-uint16_t Crc16(uint8_t * pcBlock, unsigned short len)
-{
-    uint16_t crc = 0xFFFF;
-
-    while (len--)
-        crc = (crc << 8) ^ Crc16Table[(crc >> 8) ^ *pcBlock++];
-
-    return crc;
-}
-
-void updateHead(void)
-{	
-	rxSlave.head = BUFFER_SIZE - hdma_usart1_rx.Instance->NDTR;
-	rxMaster.head = BUFFER_SIZE - hdma_usart2_rx.Instance->NDTR;
-}
-
-uint16_t dataProcessingMaster(void)
-{
-	static uint8_t state = STATE_WAITING_LENGTH;
-	uint16_t headPackage = 0;
-	uint16_t crc = 0;
-	
-	updateHead();
-	
-	if(rxMaster.head == rxMaster.tail) //The slave did not answer
-	{
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		HAL_Delay(250);
-		HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-		return 0;
-	}
-
-	while(rxMaster.head != rxMaster.tail)
-	{
-			switch(state)
-			{
-				case STATE_WAITING_LENGTH:
-				
-					headPackage = readingLength(&unionReceipt.receipt.length, &rxMaster);
-					state = STATE_RECEIVING_DATA;
-					break;
-				
-				case STATE_RECEIVING_DATA:
-				{
-					//readingData(headPackage, &rxMaster, unionReceipt.masReceipt, sizeof(receipt_t));
-					while(rxMaster.tail != headPackage)
-					{
-						unionReceipt.masReceipt[(rxMaster.tail % sizeof(receipt_t))] = rxMaster.buffer[rxMaster.tail];
-						rxMaster.tail = (rxMaster.tail + 1) % BUFFER_SIZE;
-					}
-					state = STATE_PROCESSING_DATA;
-					break;
-				}
-			}
-			
-		}
-		if(state == STATE_PROCESSING_DATA)
-		{
-			crc = Crc16(&unionReceipt.receipt.state,1);
-			if((crc!= unionReceipt.receipt.crc) || (unionReceipt.receipt.state == ERROR_RECEIPT))
-			{
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				HAL_Delay(250);
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				HAL_Delay(250);
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				HAL_Delay(250);
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			}
-			else if((crc == unionReceipt.receipt.crc) && (unionReceipt.receipt.state == OK))
-			{
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-				HAL_Delay(250);
-				HAL_GPIO_TogglePin(LED_GPIO_Port, LED_Pin);
-			}	
-				state = STATE_WAITING_LENGTH;
-	}	
-		return 1;
-}
-
-uint16_t dataProcessingSlave(void)
-{
-	static uint8_t state = STATE_WAITING_LENGTH;
-	uint16_t headPackage = 0;
-	uint16_t crc = 0;
-		
-		updateHead();
-	
-		while(rxSlave.tail != rxSlave.head)
-		{
-			switch(state)
-			{
-				case STATE_WAITING_LENGTH:
-					headPackage = readingLength(&unionUART.package.length, &rxSlave);
-					state = STATE_RECEIVING_DATA;
-					break;
-				case STATE_RECEIVING_DATA:
-					
-				//readingData(headPackage, &rxSlave,unionUART.masUART, sizeof(package_t));
-				while(rxSlave.tail != headPackage)
-				{
-					unionUART.masUART[(rxSlave.tail % sizeof(package_t))] = rxSlave.buffer[rxSlave.tail];
-					rxSlave.tail = (rxSlave.tail + 1) % BUFFER_SIZE;				
-				}
-				
-				state = STATE_PROCESSING_DATA;
-				
-				break;
-					
-			}
-			
-		}
-		
-		if(state == STATE_PROCESSING_DATA)
-		{
-			crc = Crc16(unionUART.package.data,  SIZE_DATA );
-			if(crc != unionUART.package.crc)
-			{
-				unionReceipt.receipt.state = ERROR_RECEIPT;
-			}
-			else
-			{
-				unionReceipt.receipt.state = OK;
-			}
-			unionReceipt.receipt.length = 3;
-			unionReceipt.receipt.crc = Crc16(&unionReceipt.receipt.state, 1);
-			SendMessageSlave(&unionReceipt);
-			state =STATE_WAITING_LENGTH; 
-		}
-		return 1;
-}
-
-void creatingData (unionUART_t* unionUART, uint8_t length)
-{
-	static uint8_t count = 0;
-	
-	unionUART->package.length = length + SIZE_CRC;
-	
-	for(int i=0; i<length;i++)
-	{
-		unionUART->package.data[i] +=count;
-	}
-	
-	count++;
-	
-	unionUART->package.crc =Crc16(unionUART->package.data, length);
-	
-	return;
-}
-
-uint16_t readingLength(uint8_t *length, CircBuf_t *circBuf)
-{
-	length = &circBuf->buffer[circBuf->tail];
-	
-	circBuf->tail = (circBuf->tail + 1) % BUFFER_SIZE;
-		
-	return (*length + circBuf->tail) % BUFFER_SIZE ;
-}
-
-void readingData(uint8_t headPackage, CircBuf_t *circBuf, uint8_t *dataStruct, uint16_t sizeStruct)
-{
-	while(circBuf->tail!= headPackage)
-	{
-		dataStruct[(circBuf->tail) % sizeStruct] = circBuf->buffer[circBuf->tail];
-		circBuf->tail ++;
-		circBuf->tail = circBuf->tail % BUFFER_SIZE;
-	}
-	return;
-}
 
 /* USER CODE END 4 */
 

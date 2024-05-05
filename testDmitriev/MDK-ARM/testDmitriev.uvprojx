@@ -410,6 +410,16 @@
               <FileType>1</FileType>
               <FilePath>../Core/Src/stm32f4xx_hal_msp.c</FilePath>
             </File>
+            <File>
+              <FileName>functions.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\Core\Inc\functions.h</FilePath>
+            </File>
+            <File>
+              <FileName>functions.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\Core\Src\functions.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
